@@ -1,0 +1,48 @@
+# Amazon Keyword Research & Analytics Platform
+
+**Role to highlight:** Full Stack Developer / Software Engineer / Data Engineer
+**Project Type:** Full-Stack SaaS Application with Microservices Architecture
+
+## 📌 Project Overview
+Developed a highly scalable, microservices-based SaaS platform designed to automate Amazon keyword research, competitor analysis, and product ranking optimization. The platform scrapes live product search results, processes large amounts of unstructured text data, and applies Natural Language Processing (NLP) frameworks to extract actionable, high-value keyword optimizations and market insights for e-commerce sellers.
+
+## 🛠️ Technology Stack
+- **Frontend / UI:** React.js (Vite), Tailwind CSS, React Router, Axios, Lucide React (Glassmorphic, modern UI design).
+- **Backend (API & Auth):** Node.js, Express.js, MongoDB, Mongoose, JWT (JSON Web Tokens), Bcrypt.js.
+- **Microservices (NLP & Data Science):** Python, FastAPI, Pandas (Data Manipulation), Scikit-Learn (Machine Learning / NLP features), ThreadPoolExecutor (Concurrency).
+- **Web Scraping:** Python-based parsers (Playwright/BeautifulSoup style scraping).
+
+## 🚀 Key Features & Technical Details (For Resume Bullet Points)
+
+**1. Natural Language Processing (NLP) Engine**
+- Engineered a Python microservice to process massive datasets of unstructured product titles.
+- Implemented robust tokenization that strips standard English stopwords as well as e-commerce/Amazon-specific filler noise (e.g., "bundle", "prime", "compatible").
+- Utilized **Scikit-learn's TfidfVectorizer** to extract N-grams (unigrams, bigrams, trigrams) and evaluate term statistical significance.
+
+**2. Proprietary Keyword Ranking Algorithm**
+- Developed a dynamic composite scoring model for extracted keywords instead of relying purely on term frequency.
+- The algorithm calculates a final "Importance Score" based on:
+  - **Frequency (35%):** Occurrences across product listings.
+  - **Statistical Significance (25%):** Mean TF-IDF score.
+  - **Rank-Weighted Frequency (25%):** Giving higher weight to keywords found in top-ranking (page 1) products.
+  - **Position Average (15%):** The average search rank trajectory of the keyword.
+- Built aggressive data filtering thresholds (requiring keywords to appear in >10% of results) to automatically eliminate competitor brand anomalies.
+
+**3. Data Scraping & Concurrency Pipeline**
+- Built an automated web scraping pipeline to extract real-time live Amazon product listings including titles, prices, and organic rank positions.
+- Implemented Python's `ThreadPoolExecutor` and `asyncio` inside the FastAPI backend to allow non-blocking, concurrent execution of scraping and heavy matrix-multiplication operations without stalling the server.
+
+**4. Secure Backend API & Database Architecture**
+- Architected a robust Express.js backend managing user authentication via JWT and securely hashing passwords with `bcryptjs`.
+- Designed relational MongoDB schemas using `Mongoose` to scale user configurations, generated reports, and search history.
+- RESTful interactions safely route data between the Node.js user-gateway and the Python NLP microservice.
+
+**5. Modern Interactive Frontend**
+- Developed a responsive Single Page Application (SPA) using React and Vite.
+- Implemented high-fidelity UI/UX employing "Glassmorphism" design aesthetics with Tailwind CSS, ensuring smooth rendering of complex data components, data tables, and user dashboards.
+
+## 📈 Example Resume Bullet Points (Copy & Paste)
+- *Architected a distributed MERN + Python SaaS platform, decoupling intensive NLP and data-scraping workloads into isolated FastAPI microservices to ensure 99% uptime of the core client-facing API.*
+- *Engineered a proprietary keyword-ranking algorithm using Scikit-learn (TF-IDF) and Pandas, weighting occurrences against real-world Amazon search-rankings to deliver highly accurate e-commerce insights.*
+- *Developed a concurrent data ingestion pipeline utilizing ThreadPoolExecutor, automating the scraping of unstructured product data across multiple search pages instantly.*
+- *Built a responsive, glassmorphic frontend UI in React with Tailwind CSS, connected seamlessly via Axios to a secure Node/Express backend featuring JWT authentication and MongoDB persistence.*
