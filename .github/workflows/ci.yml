@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package + test dependencies
+        run: pip install -r requirements.txt -e .
+
+      - name: Run test suite
+        run: pytest tests/ -q
+
+    # NOTE: scoped to amazon_keyword_tool/'s own suite (tests/), which runs
+    # entirely against fixture data — no live scraping or browser install
+    # needed. server/ (Node) and frontend/ (React) aren't covered here;
+    # they need a running MongoDB and are exercised manually, not by CI.

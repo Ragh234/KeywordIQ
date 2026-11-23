@@ -1,18 +1,30 @@
+"""Manual probe: run a live scrape + full analysis pipeline for one keyword
+and print the resulting top keywords and n-gram frequencies.
+
+Requires Playwright browsers installed (`playwright install chromium`) and
+a working network path to amazon.in. Not part of the automated test suite —
+see tests/ for that.
+
+Run from anywhere:
+    python scripts/test_live.py
+"""
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(r"c:\Users\rmala\OneDrive\Desktop\BTP"))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, PROJECT_ROOT)
 
 from amazon_keyword_tool.scraper.browser import scrape_amazon_search
 from amazon_keyword_tool.scraper.parser import parse_search_results
 from amazon_keyword_tool.analysis.data_cleaning import clean_products
 from amazon_keyword_tool.analysis.keyword_research import analyze_keywords
 
+
 def main():
     kw = "casio"
     print(f"Scraping for {kw}...")
     pages = scrape_amazon_search(kw, max_pages=1)
-    
+
     all_products = []
     current_rank = 1
     for page_num, html in pages:
@@ -20,16 +32,16 @@ def main():
         if products:
             all_products.extend(products)
             current_rank += len(products)
-            
+
     print(f"Parsed {len(all_products)} products.")
     df = clean_products(all_products)
     print(f"Cleaned {len(df)} products.")
-    
+
     report = analyze_keywords(df, search_keyword=kw)
     print("--- TOP KEYWORDS ---")
     for k in report.top_keywords:
         print(f"{k.keyword}: freq={k.frequency}, tfidf={k.tfidf_score:.3f}, rank={k.avg_rank:.1f}, imp={k.importance:.3f}")
-        
+
     print("--- FREQUENCIES (if any were filtered out) ---")
     from amazon_keyword_tool.analysis.keyword_extractor import _tokenise, _build_ngrams
     from collections import Counter
@@ -38,6 +50,7 @@ def main():
         tokens = _tokenise(str(t))
         counts.update(set(_build_ngrams(tokens, 3)))
     print(counts.most_common(20))
+
 
 if __name__ == "__main__":
     main()
