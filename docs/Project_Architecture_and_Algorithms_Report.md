@@ -48,9 +48,9 @@ Data is ingested as raw DOM strings and scrubbed via Python `Regular Expressions
 ## 4. Reverse-Engineered A9 Ranking Engine
 A critical module in this system is the `composite_a9_score()`. Amazon's A9 search algorithm is proprietary, so this project implements a reversed mathematical approximation utilizing five configurable weights. The score places each product on a localized `[0, 1]` index scale.
 
-1. **Text Relevance (30% weight):** Assesses the phrase match ratio of the search term against the product title. It evaluates subset token arrays and scales the score based on match percentage.
+1. **Text Relevance (30% weight):** Scores how well the title matches the search term: the exact phrase scores 1.0, all of its words in any order 0.75, at least half of the words 0.40, and fewer than half a proportional score below 0.35.
 2. **Sales Velocity Proxy (25% weight):** Uses review counts as a trailing indicator of sales. Because reviews grow exponentially, the algorithm uses a **Log-Scale Normalization** (`math.log1p()`) to prevent products with 50,000 reviews from entirely eclipsing products with 1,000 reviews.
-3. **Customer Satisfaction (15% weight):** Implements a **Sigmoid Mapping Curve** (`1.0 / (1.0 + e^(-3.0 * (rating - 3.8)))`). This mathematically punishes products under 3.5 stars severely while flattening out the benefit difference between a 4.6 and a 4.8.
+3. **Customer Satisfaction (15% weight):** Implements a **Sigmoid Mapping Curve** (`1.0 / (1.0 + e^(-3.0 * (rating - 3.8)))`). This mathematically punishes products under 3.5 stars severely while flattening out the benefit difference between a 4.6 and a 4.8. A missing rating gets a neutral 0.25.
 4. **Price Competitiveness (15% weight):** Utilizes a **Gaussian Distance** formula (a bell curve). It maps the distance (`z-score`) of a product's price from the computed category median. Both extremely cheap and outrageously expensive items are penalized.
 5. **Observed Rank Position (15% weight):** Provides an **Inverse-Log Decay** point distribution giving significantly more value to the transition from Rank 1→5 than Rank 15→20.
 
@@ -68,15 +68,23 @@ The engine calculates **Term Frequency - Inverse Document Frequency (TF-IDF)** t
 ### The Composite Keyword Value Equation
 Because counting keywords isn't enough, each extracted keyword is rigorously scored via:
 - **Frequency (35%):** Pure occurrence distribution.
-- **TF-IDF Variance (25%):** The word's statistical significance across the product cluster.
-- **Rank-Weighted Frequency (25%):** A keyword is deemed highly important if it shows up in products sitting at Rank #1 through #5, compared to Rank #20 through #30.
+- **Mean TF-IDF (25%):** The keyword's average TF-IDF score across all titles, a measure of how distinctive it is.
+- **Rank-Weighted Frequency (25%):** Sums 1/rank over every product containing the keyword, so a keyword found in top-ranked listings counts far more than one found only further down.
 - **Position Average Penalty (15%):** Penalizes keywords whose host-products average poor search trajectories.
-- **Anomaly Detection Filter:** Keywords must represent at least a 10% saturation rate minimum, completely filtering out unique competitor brand names that happen to appear near the top.
+- **Anomaly Detection Filter:** Keywords must appear in at least 10% of the products (and at least 4 products), which filters out one-off competitor brand names that happen to appear near the top.
 
 ---
 
 ## 6. Competitor Gaps & Difficulty Metrics
 The backend finishes its analysis by running several market computations:
-- **Competitor Gaps Calculation:** Automatically cross-pollinates the dataframe into 'Top N' and 'Bottom N' groups. By running percentile evaluations, the code identifies "Gap Keywords" that Top Ranked products heavily utilize but Bottom Ranked products completely lack.
-- **Keyword Ranking Difficulty:** Uses a **Weighted Harmonic Mean** (60/40 Review-Rating Split) formula, scoring a keyword's difficulty [0 - 100] based on the combined rating dominance and review-wall of the incumbents on page 1.
+- **Competitor Gaps Calculation:** Products ranked 1-5 are compared against the rest. A keyword is a "Gap Keyword" when it appears in at least 30% of the top listings and at most 20% of the rest, with a difference of at least 15 percentage points.
+- **Keyword Ranking Difficulty:** Uses a **weighted average** (60% review signal, 40% rating signal), scoring a keyword's difficulty [0 - 100] from the products whose titles contain it. The review signal is the log-scaled average review count (10,000+ reviews = 100); the rating signal is the average rating rescaled from 3.0 (0) to 5.0 (100). A keyword is matched to a product through the same tokeniser and n-grams used to extract it, so multi-word keywords count correctly.
 - **Price Sweet Spot Analytics:** Calculates the Interquartile Range (25th and 75th percentiles) strictly inside the "Top Ranked" items dataframe, telling the seller exactly what price boundary converts the best in the organic search results algorithm.
+
+---
+
+## 7. Product A9 Score Table & Suggested Listing Title
+Two outputs make the analysis directly actionable in the UI:
+
+- **Top Products by A9 Score:** the API returns the 20 highest-scoring products with their five factor scores (relevance, sales velocity, satisfaction, price, rank) and the weights from `config.SCORE_WEIGHTS`. The UI draws each product's score as a bar split into the five weighted contributions. The score is an estimate built from public signals; it is not Amazon's actual algorithm.
+- **Suggested Listing Title** (`analysis/title_builder.py`): a rule-based starting title, not an AI rewrite. It begins with the search keyword and adds top keywords and competitor-gap keywords alternately. Because the extractor returns overlapping n-grams of the same phrase, fragments of a longer keyword are dropped and keywords that overlap end-to-start are merged into one chain ("ipx5 water resistant" + "water resistant touch" becomes "ipx5 water resistant touch"), which keeps the word order of real listings. Multi-word chains are added before single words, a word never repeats, and the title aims for about 120 characters (long keyword lists read as spam) while never exceeding Amazon's 200-character limit. Because the keywords come from statistics, a competitor's brand name can slip in, so the UI tells the seller to edit the title; it also shows a live character count against the 200 limit.
