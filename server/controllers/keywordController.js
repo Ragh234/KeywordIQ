@@ -1,4 +1,5 @@
 const axios = require("axios");
+const mongoose = require("mongoose");
 const Report = require("../models/Report");
 
 const PYTHON_API = process.env.PYTHON_API_URL || "http://127.0.0.1:8000";
@@ -78,6 +79,10 @@ exports.getReports = async (req, res) => {
 // GET /api/reports/:id
 exports.getReport = async (req, res) => {
     try {
+        if (!mongoose.isValidObjectId(req.params.id)) {
+            return res.status(404).json({ message: "Report not found" });
+        }
+
         const report = await Report.findOne({
             _id: req.params.id,
             userId: req.user._id,
@@ -97,6 +102,10 @@ exports.getReport = async (req, res) => {
 // DELETE /api/reports/:id
 exports.deleteReport = async (req, res) => {
     try {
+        if (!mongoose.isValidObjectId(req.params.id)) {
+            return res.status(404).json({ message: "Report not found" });
+        }
+
         const report = await Report.findOneAndDelete({
             _id: req.params.id,
             userId: req.user._id,
