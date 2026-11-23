@@ -1,10 +1,11 @@
+import asyncio
 import os
+import traceback
 import sys
-import json
-import glob
 from concurrent.futures import ThreadPoolExecutor
+
+import pandas as pd
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Add the project root to the path so we can import amazon_keyword_tool
@@ -13,24 +14,23 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from amazon_keyword_tool.scraper.browser import scrape_amazon_search
 from amazon_keyword_tool.scraper.parser import parse_search_results
 from amazon_keyword_tool.analysis.data_cleaning import clean_products
-from amazon_keyword_tool.analysis.keyword_research import analyze_keywords
-from amazon_keyword_tool.config import SEARCH_KEYWORDS
+from amazon_keyword_tool.analysis.keyword_research import analyze_keywords, KeywordReport
+from amazon_keyword_tool.analysis.title_builder import build_title
+from amazon_keyword_tool.config import SCORE_WEIGHTS
 
+# No CORS middleware on purpose: browsers talk to the Express server, which
+# calls this service server-to-server (see server/controllers/keywordController.js).
 app = FastAPI(title="Amazon Keyword Tool API")
 
-# Configure CORS for local React development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # For dev, allow all. Change in prod.
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# Playwright's sync API blocks, so analyses run in worker threads.
 executor = ThreadPoolExecutor(max_workers=2)
 
-# ── Output directory (relative to project root) ──
-OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "output"))
+TOP_PRODUCTS_LIMIT = 20
+PRODUCT_COLUMNS = [
+    "title", "product_url", "price", "rating", "review_count", "rank_position",
+    "a9_score", "score_relevance", "score_velocity", "score_satisfaction",
+    "score_price", "score_rank",
+]
 
 
 class AnalyzeRequest(BaseModel):
@@ -63,15 +63,29 @@ def run_blocking_analysis(keyword: str, max_pages: int, top_n: int) -> dict:
         raise ValueError(f"No products parsed for keyword: '{keyword}'")
 
     df = clean_products(all_products)
-    report = analyze_keywords(df, search_keyword=keyword)
+    report = analyze_keywords(df, search_keyword=keyword, top_n=top_n)
+    return report_to_dict(report)
 
-    # Convert report to dict — include title_patterns
-    import pandas as pd
 
-    def _df_to_records(df_data: pd.DataFrame) -> list:
-        if df_data is None or df_data.empty:
-            return []
-        return df_data.where(df_data.notna(), None).to_dict("records")
+def _df_to_records(df_data: pd.DataFrame, columns: list[str] | None = None) -> list:
+    """DataFrame -> list of dicts, with NaN turned into None so it is valid JSON."""
+    if df_data is None or df_data.empty:
+        return []
+    if columns is not None:
+        df_data = df_data[[c for c in columns if c in df_data.columns]]
+    return df_data.astype(object).where(df_data.notna(), None).to_dict("records")
+
+
+def report_to_dict(report: KeywordReport) -> dict:
+    """Shape a KeywordReport into the JSON the frontend consumes."""
+    top_products = _df_to_records(
+        report.scored_products_df.head(TOP_PRODUCTS_LIMIT), PRODUCT_COLUMNS
+    )
+    suggested_title = build_title(
+        report.search_keyword,
+        [kw.keyword for kw in report.top_keywords],
+        report.competitor_gaps,
+    )
 
     return {
         "search_keyword": report.search_keyword,
@@ -82,17 +96,18 @@ def run_blocking_analysis(keyword: str, max_pages: int, top_n: int) -> dict:
                 "importance": kw.importance,
                 "frequency": kw.frequency,
                 "avg_rank": kw.avg_rank,
-                "tfidf_score": getattr(kw, "tfidf_score", 0),
-                "rank_weighted_freq": getattr(kw, "rank_weighted_freq", 0),
+                "tfidf_score": kw.tfidf_score,
+                "rank_weighted_freq": kw.rank_weighted_freq,
             }
             for kw in report.top_keywords
         ],
-        "difficulty_table": report.difficulty_table.to_dict(orient="records")
-        if not report.difficulty_table.empty
-        else [],
+        "difficulty_table": _df_to_records(report.difficulty_table),
         "price_sweet_spot": report.price_sweet_spot,
         "competitor_gaps": report.competitor_gaps,
         "title_patterns": _df_to_records(report.title_patterns),
+        "top_products": top_products,
+        "score_weights": SCORE_WEIGHTS,
+        "suggested_title": suggested_title,
     }
 
 
@@ -100,8 +115,7 @@ def run_blocking_analysis(keyword: str, max_pages: int, top_n: int) -> dict:
 async def analyze_endpoint(req: AnalyzeRequest):
     """Trigger the keyword analysis pipeline."""
     try:
-        import asyncio
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             executor,
             run_blocking_analysis,
@@ -113,72 +127,8 @@ async def analyze_endpoint(req: AnalyzeRequest):
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
-
-
-@app.get("/api/reports")
-def list_reports():
-    """List all saved JSON reports from the output directory."""
-    reports = []
-    pattern = os.path.join(OUTPUT_DIR, "report_*.json")
-    files = sorted(glob.glob(pattern), reverse=True)  # newest first
-
-    for filepath in files:
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            metadata = data.get("metadata", {})
-            top_keywords = data.get("top_keywords", [])
-            top_kw = top_keywords[0]["keyword"] if top_keywords else None
-
-            # Use filename (without extension) as ID
-            report_id = os.path.splitext(os.path.basename(filepath))[0]
-
-            reports.append(
-                {
-                    "id": report_id,
-                    "search_keyword": metadata.get("search_keyword", "unknown"),
-                    "total_products": metadata.get("total_products", 0),
-                    "generated_at": metadata.get("generated_at", ""),
-                    "top_keyword": top_kw,
-                }
-            )
-        except Exception:
-            continue  # skip malformed files
-
-    return reports
-
-
-@app.get("/api/reports/{report_id}")
-def get_report(report_id: str):
-    """Return the full JSON content of a specific saved report."""
-    # Sanitize report_id to prevent path traversal
-    safe_id = os.path.basename(report_id)
-    filepath = os.path.join(OUTPUT_DIR, f"{safe_id}.json")
-
-    if not os.path.isfile(filepath):
-        raise HTTPException(status_code=404, detail="Report not found")
-
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Flatten for frontend consumption (match analyze endpoint shape)
-        metadata = data.get("metadata", {})
-        return {
-            "search_keyword": metadata.get("search_keyword", "unknown"),
-            "total_products": metadata.get("total_products", 0),
-            "top_keywords": data.get("top_keywords", []),
-            "difficulty_table": data.get("difficulty_table", []),
-            "price_sweet_spot": data.get("price_sweet_spot", {}),
-            "competitor_gaps": data.get("competitor_gaps", []),
-            "title_patterns": data.get("title_patterns", []),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading report: {str(e)}")
 
 
 @app.get("/api/health")
