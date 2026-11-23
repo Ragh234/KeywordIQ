@@ -2,6 +2,7 @@
     "name": "btp-server",
     "version": "1.0.0",
     "description": "Amazon Keyword Research SaaS - Backend API",
+    "author": "Raghav Malani, Kavish Jain",
     "main": "index.js",
     "scripts": {
         "start": "node index.js",

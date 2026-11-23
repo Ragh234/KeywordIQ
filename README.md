@@ -137,6 +137,6 @@ are not part of the automated suite.
   design of the exercise; `SEARCH_SELECTORS` in `config.py` is the single
   place to update if Amazon changes its DOM.
 
-## Author
+## Authors
 
-Raghav Malani
+Built as a BTP project by Raghav Malani and Kavish Jain.

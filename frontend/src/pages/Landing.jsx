@@ -120,8 +120,10 @@ export default function Landing() {
                 </div>
             </div>
 
-            {/* Footer spacer */}
-            <div className="h-12" />
+            {/* Credits */}
+            <p className="text-center text-xs text-slate-500 pt-10 pb-12">
+                Built by Raghav Malani and Kavish Jain
+            </p>
         </div>
     );
 }

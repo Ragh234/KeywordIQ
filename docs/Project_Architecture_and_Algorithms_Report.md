@@ -1,5 +1,7 @@
 # Comprehensive Technical Report: Amazon Keyword Research SaaS Platform
 
+*By Raghav Malani and Kavish Jain*
+
 ## 1. Executive Summary
 This project is a highly scalable, multi-service Software as a Service (SaaS) platform built for e-commerce sellers. It automates the process of scraping Amazon product pages and applies sophisticated Natural Language Processing (NLP) and Artificial Intelligence models to extract high-value seller keywords, analyze competitor gaps, calculate price "sweet spots", and estimate keyword ranking difficulty.
 
