@@ -139,4 +139,7 @@ are not part of the automated suite.
 
 ## Authors
 
-Built as a BTP project by Raghav Malani and Kavish Jain.
+Built as a BTP project by:
+
+- **Raghav Malani** ([@Ragh234](https://github.com/Ragh234))
+- **Kavish Jain** ([@KavishJain1904](https://github.com/KavishJain1904))
