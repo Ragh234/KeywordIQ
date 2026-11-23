@@ -144,14 +144,9 @@ def run_analysis(products: list[dict], keyword: str, top_n: int) -> "KeywordRepo
     """Clean → analyse → return KeywordReport."""
     from amazon_keyword_tool.analysis.data_cleaning import clean_products
     from amazon_keyword_tool.analysis.keyword_research import analyze_keywords
-    from amazon_keyword_tool.config import NGRAM_RANGE
-
-    # Update per-run top-n if different from config default
-    import amazon_keyword_tool.config as cfg
-    cfg.TOP_KEYWORDS_N = top_n
 
     df     = clean_products(products)
-    report = analyze_keywords(df, search_keyword=keyword)
+    report = analyze_keywords(df, search_keyword=keyword, top_n=top_n)
     return report
 
 

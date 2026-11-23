@@ -11,6 +11,14 @@ frequency.
 
 Full write-up of the scoring algorithm: [docs/Project_Architecture_and_Algorithms_Report.md](docs/Project_Architecture_and_Algorithms_Report.md)
 
+## Features
+
+- **Keyword research:** TF-IDF n-gram extraction ranked by a composite importance score, with per-keyword difficulty.
+- **Top products by A9 score:** the 20 best-scoring products, each with a bar showing how its five score factors (relevance, sales, rating, price, rank) contribute. This is an estimate, not Amazon's real algorithm.
+- **Suggested listing title:** a rule-based title (about 120 characters, phrases before single words) built from the top and competitor-gap keywords, editable in the UI with a live 200-character counter and a Copy button. It is a draft: remove any competitor brand names that slip in.
+- **Competitor gaps, price sweet spot, and title patterns** (top 10 vs the rest).
+- **Accounts and history:** sign up, save reports, reopen or delete them later.
+
 ## Architecture
 
 Four independent pieces, each replaceable on its own:
@@ -34,7 +42,7 @@ Four independent pieces, each replaceable on its own:
 | Layer | Path | Role |
 |---|---|---|
 | Core package | [`amazon_keyword_tool/`](amazon_keyword_tool/) | Playwright scraper → BeautifulSoup parser → pandas cleaning → TF-IDF keyword extraction → composite scoring. Importable and independently testable; also runnable as a CLI. |
-| Analysis API | [`api/main.py`](api/main.py) | FastAPI wrapper that runs the package's scraper+analysis in a `ThreadPoolExecutor` (Playwright is sync) and exposes `/api/analyze`, `/api/reports`. |
+| Analysis API | [`api/main.py`](api/main.py) | FastAPI wrapper that runs the package's scraper+analysis in a `ThreadPoolExecutor` (Playwright is sync) and exposes `/api/analyze` and `/api/health`. |
 | App backend | [`server/`](server/) | Express + MongoDB. Owns user auth (JWT, bcrypt) and saved-report storage; proxies analysis requests to the FastAPI service (`PYTHON_API_URL`). |
 | Frontend | [`frontend/`](frontend/) | React (Vite) dashboard — search, report view, history, auth pages. Vite dev server proxies `/api` to the Express server. |
 
@@ -114,20 +122,24 @@ pip install -r requirements.txt
 pytest tests/
 ```
 
-`tests/` covers cleaning, extraction, scoring, and the CLI's integration
-path against fixture data — no live network calls or browser required. The
+`tests/` covers cleaning, extraction, scoring, the title builder, the FastAPI
+endpoints (scraping stubbed out), and the CLI's integration path against fixture data — no live network calls or browser required. The
 three `scripts/test_*.py` files are separate manual probes against a real
 Amazon page (need `playwright install chromium` and network access); they
 are not part of the automated suite.
 
 ## Known trade-offs
 
-- `api/main.py` sets `CORSMiddleware(allow_origins=["*"])`. Deliberate for
-  local dev — tighten this before any real deployment.
+- `api/main.py` has no authentication and no CORS middleware. It is meant to be
+  called only by the Express server (server to server), so keep it on a private
+  network and never expose it to browsers or the public internet.
 - Scraping amazon.in directly is fragile to markup/selector changes by
   design of the exercise; `SEARCH_SELECTORS` in `config.py` is the single
   place to update if Amazon changes its DOM.
 
-## Author
+## Authors
 
-Raghav Malani
+Built as a BTP project by:
+
+- **Raghav Malani** ([@Ragh234](https://github.com/Ragh234))
+- **Kavish Jain** ([@KavishJain1904](https://github.com/KavishJain1904))

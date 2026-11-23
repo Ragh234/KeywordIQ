@@ -2,6 +2,7 @@
   "name": "btp-frontend",
   "private": true,
   "version": "1.0.0",
+  "author": "Raghav Malani, Kavish Jain",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -13,11 +13,15 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
-// Auto-logout on 401
+// Requests where a 401 means "wrong credentials", not "your session expired".
+const AUTH_FORM_URLS = ["/auth/login", "/auth/signup"];
+
+// Auto-logout on 401 (expired or invalid token)
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
+        const isAuthForm = AUTH_FORM_URLS.includes(error.config?.url);
+        if (error.response?.status === 401 && !isAuthForm) {
             localStorage.removeItem("token");
             localStorage.removeItem("user");
             window.location.href = "/login";

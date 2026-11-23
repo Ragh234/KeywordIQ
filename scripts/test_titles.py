@@ -27,7 +27,7 @@ def main():
     for page_num, html in pages:
         products = parse_search_results(html=html, search_keyword=kw, page_number=page_num, start_rank=1)
         for i, p in enumerate(products[:10]):
-            print(f"{i+1}. {p.title}")
+            print(f"{i+1}. {p['title']}")
         break
 
 
