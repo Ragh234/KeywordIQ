@@ -22,6 +22,8 @@ import numpy as np
 
 from amazon_keyword_tool.analysis.keyword_extractor import (
     KeywordInfo,
+    _build_ngrams,
+    _tokenise,
     extract_keywords,
     keyword_frequency_by_rank,
 )
@@ -176,7 +178,11 @@ class KeywordReport:
 
 # ── Main analysis function ────────────────────────────────────────────────────
 
-def analyze_keywords(df: pd.DataFrame, search_keyword: str) -> KeywordReport:
+def analyze_keywords(
+    df: pd.DataFrame,
+    search_keyword: str,
+    top_n: Optional[int] = None,
+) -> KeywordReport:
     """
     Run the full keyword research pipeline on a cleaned products DataFrame.
 
@@ -191,6 +197,7 @@ def analyze_keywords(df: pd.DataFrame, search_keyword: str) -> KeywordReport:
     Args:
         df:             Cleaned products DataFrame (from data_cleaning.clean_products)
         search_keyword: The search term used to produce this page of results
+        top_n:          How many top keywords to return (default: config.TOP_KEYWORDS_N)
 
     Returns:
         KeywordReport with all analysis sections populated
@@ -211,19 +218,22 @@ def analyze_keywords(df: pd.DataFrame, search_keyword: str) -> KeywordReport:
     keywords = extract_keywords(
         scored_df,
         ngram_range=NGRAM_RANGE,
-        top_n=TOP_KEYWORDS_N,
+        top_n=top_n if top_n is not None else TOP_KEYWORDS_N,
     )
 
     # 3. Keyword difficulty
+    # Match a keyword to a product the same way it was extracted: through the
+    # tokeniser's n-grams. A raw substring search misses phrases whose words
+    # were separated by a stopword or punctuation in the original title.
+    title_ngrams = [
+        set(_build_ngrams(_tokenise(str(t)), max_n=NGRAM_RANGE[1]))
+        for t in scored_df["title"].fillna("")
+    ]
     difficulty_rows = []
     for kw_info in keywords:
         kw = kw_info.keyword
-        # Find products whose title contains this keyword
-        mask = scored_df["title"].str.contains(
-            re.escape(kw) if len(kw) > 1 else kw,
-            case=False,
-            na=False,
-            regex=False,
+        mask = pd.Series(
+            [kw in grams for grams in title_ngrams], index=scored_df.index
         )
         subset   = scored_df[mask]
         diff     = _keyword_difficulty(subset)
@@ -257,6 +267,3 @@ def analyze_keywords(df: pd.DataFrame, search_keyword: str) -> KeywordReport:
         scored_products_df=scored_df,
     )
 
-
-# Needed for title contains check
-import re
